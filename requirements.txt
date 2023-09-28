@@ -1,0 +1,17 @@
+gymnasium 
+numpy 
+pandas 
+joblib 
+pyfolio 
+matplotlib 
+yfinance
+pdblp
+stockstats
+plotly
+pandas-market-calendars
+pytz
+ray
+tensorflow 
+torch
+pympler
+
