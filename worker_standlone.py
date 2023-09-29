@@ -33,14 +33,16 @@ class Spec(object):
 
 
 class WorkerStandAlone(gym.Env):
-    def __init__(self, initial_capital=1e6, trading_cost=0.001, initial_shares_held = 0,
-                 invalid_action_penalty=-0, print_verbosity=10, tic=None):
+    def __init__(self,  initial_capital=1e6, trading_cost=0.001, initial_shares_held = 0,
+                 invalid_action_penalty=-0, print_verbosity=1, worker_id=None, ticker_df=None, tic=None, **kwargs):
         super(WorkerStandAlone, self).__init__()
+
         stock_data=pd.read_pickle("/Users/floriankockler/Documents/GitHub.nosync/quantumai4/train1.pkl")
         filted_df = stock_data[stock_data["tic"]=="ABT.US"]
-        self.df = filted_df
+        self.df = ticker_df
 
         self.tic = tic
+        self.worker_id = worker_id
         self.day = 0
         self.data = self.df.loc[self.day, :]
         self.trading_cost = trading_cost
@@ -134,7 +136,6 @@ class WorkerStandAlone(gym.Env):
             'amount': spaces.Box(low=0, high=1, shape=(1,), dtype=np.float32)  # Percentage of cash/shares to use
         })
 
-
     
     def set_directives(self, directives):
         """To eb called from Manager to adjust cash"""
@@ -145,11 +146,6 @@ class WorkerStandAlone(gym.Env):
                 new_cash_allocation = self.current_cash + change_in_value
                 self.current_cash = new_cash_allocation
   
-  
-
-
-    
-
 
     def step(self, action):
         done = self.day >= len(self.df.index.unique()) - 1
@@ -192,8 +188,7 @@ class WorkerStandAlone(gym.Env):
    
     def _handle_done(self):
             if self.episode % self.print_verbosity == 0:
-                print("=========HRL is done=============")
-                print("Worker is done")
+                print(f"========={self.worker_id} is done=============")
                 print(f"day: {self.day}, episode: {self.episode}")
                 print(f"Beginn_Portfolio_Value: {self.cash_initial}")           
                 print(f"End Total Assets: {self._calculate_assets()}")           
