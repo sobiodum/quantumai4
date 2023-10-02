@@ -41,6 +41,7 @@ class Controller(gym.Env):
         done = False
         self.step_count += 1
         reward = 0
+        print("controller: agents: ",agents)
 
    
 
@@ -54,7 +55,7 @@ class Controller(gym.Env):
 
 
 
-
+  
         return obs, reward, done, truncated, info
     
 

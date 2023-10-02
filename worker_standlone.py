@@ -70,7 +70,7 @@ class WorkerStandAlone(gym.Env):
         self.shares_held = 0
         self.average_stock_cost = 0.0
 
-        #Manager/HRL related information
+     
   
 
         #Memory & Reward related Info
