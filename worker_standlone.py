@@ -37,8 +37,8 @@ class WorkerStandAlone(gym.Env):
                  invalid_action_penalty=-0, print_verbosity=1, worker_id=None, ticker_df=None, tic=None, **kwargs):
         super(WorkerStandAlone, self).__init__()
 
-        stock_data=pd.read_pickle("/Users/floriankockler/Documents/GitHub.nosync/quantumai4/train1.pkl")
-        filted_df = stock_data[stock_data["tic"]=="ABT.US"]
+        # stock_data=pd.read_pickle("/Users/floriankockler/Documents/GitHub.nosync/quantumai4/train1.pkl")
+        # filted_df = stock_data[stock_data["tic"]=="ABT.US"]
         self.df = ticker_df
 
         self.tic = tic
@@ -168,6 +168,7 @@ class WorkerStandAlone(gym.Env):
             self.action_type.append(action_type)
             self.day += 1
             self.data = self.df.loc[self.day, :]
+            #!self.state not referenced anywhere
             self.state = self._get_state()
             end_adj_portfolio_value = self._calculate_assets()
             # print("end_adj_portfolio_value", self._calculate_assets()/1000000)

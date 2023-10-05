@@ -69,7 +69,7 @@ param_space = {
         "lambda": tune.uniform(0.9,1.0),
         "entropy_coeff": tune.uniform(0.01,0.1),
         "vf_loss_coeff": tune.uniform(0.1,0.3),
-        "num_workers": 3, 
+        "num_workers": 7, 
         #Change for Debugging
         "log_level": "ERROR",
         "output": "logdir",
@@ -88,10 +88,10 @@ def tuning_func():
         search_alg=None,
         scheduler=asha_scheduler,
         progress_reporter=CLIReporter(max_progress_rows=10,max_report_frequency=120),
-        max_concurrent_trials=2,
+        max_concurrent_trials=1,
         #checkpoint_config not checked yet
         checkpoint_config={
-            "num_to_keep": 3,
+            "num_to_keep": 1,
             "checkpoint_score_attribute": "episode_reward_mean",
             "checkpoint_score_order": "max",
             "checkpoint_frequency": 10
@@ -99,5 +99,5 @@ def tuning_func():
         )
     return analysis
 
-analysis = tuning_func.remote
+analysis = ray.get(tuning_func.remote())
 print("Best hyperparameters found were: ", pretty_print(analysis.best_config))
