@@ -36,14 +36,14 @@ class Spec(object):
 
 
 class Worker(gym.Env):
-    def __init__(self,  initial_capital=1e6, allocation_limit=50000, trading_cost=0.001, initial_shares_held=0,
+    def __init__(self,  initial_capital=1e6, allocation_threshold=0.05, trading_cost=0.001, initial_shares_held=0,
                  invalid_action_penalty=-0, print_verbosity=1, worker_id=None, ticker_df=None, tic=None, **kwargs):
         super(Worker, self).__init__()
 
         # stock_data=pd.read_pickle("/Users/floriankockler/Documents/GitHub.nosync/quantumai4/train1.pkl")
         # filted_df = stock_data[stock_data["tic"]=="ABT.US"]
         self.df = ticker_df
-        self.current_allocation_limit = np.float32(allocation_limit)
+
         self.tic = tic
         self.worker_id = worker_id
         self.day = 0
@@ -53,6 +53,7 @@ class Worker(gym.Env):
         self.episode = 0
         self.print_verbosity = print_verbosity
         self.done = False
+        self.allocation_threshold = allocation_threshold
 
         # State Info
         self.cash_initial = np.float32(initial_capital)
@@ -97,7 +98,6 @@ class Worker(gym.Env):
         self.total_costs = 0
         self.total_trades = 0
         self.current_step_cost = 0
-        self.allocation_limit_breach_count = 0
 
         self.spec = Spec(id="worker-single-stock",
                          max_episode_steps=len(self.df.index.unique()) - 1)
@@ -110,44 +110,30 @@ class Worker(gym.Env):
             'day': spaces.Box(low=-np.inf, high=np.inf, shape=(1,), dtype=np.float32),
             'tech_indicators': spaces.Box(low=-np.inf, high=np.inf, shape=(14,), dtype=np.float32),
             'pnl': spaces.Box(low=-np.inf, high=np.inf, shape=(1,), dtype=np.float32),
-            # 'return_per_volatility': spaces.Box(low=-np.inf, high=np.inf, shape=(1,), dtype=np.float32),
             'total_trades': spaces.Box(low=-np.inf, high=np.inf, shape=(1,), dtype=np.float32),
             'current_stock_exposure': spaces.Box(low=-np.inf, high=np.inf, shape=(1,), dtype=np.float32),
-            'current_allocation_limit': spaces.Box(low=-np.inf, high=np.inf, shape=(1,), dtype=np.float32),
-
 
         })
 
-        self.action_space = spaces.Dict({
-            'type': spaces.Discrete(3),  # 0: hold, 1: buy, 2: sell
-            # Percentage of cash/shares to use
-            'amount': spaces.Box(low=0, high=1, shape=(1,), dtype=np.float32)
-        })
+        self.action_space = spaces.Box(
+            low=0, high=1, shape=(1,), dtype=np.float32)
 
-    def step(self, action, allocation_limit):
+    def step(self, action, controller_action):
         done = self.day >= len(self.df.index.unique()) - 1
         if done:
             self.done = True
             # self._handle_done()
         else:
             self.current_step_cost = 0
-            self.current_allocation_limit = np.float32(allocation_limit)
-            # print(allocation_limit, self.worker_id)
             begin_adj_portfolio_value = self._calculate_assets()
             assert np.isfinite(
                 begin_adj_portfolio_value), f"begin_adj_portfolio_value is not finite (could be NaN, inf, or -inf) at day {self.day} and worker {self.worker_id}"
 
-            action_type = action['type']
-            action_amount = action['amount'][0]
+            trade = self._handle_trading(action)
+            # self.actions_memory.append(action_amount)
+            self.trading_memory.append(trade)
 
-            if action_type == 0:  # hold
-                pass
-            elif action_type in [1, 2]:  # buy or sell
-                trade = self._handle_trading(action_type, action_amount)
-                self.actions_memory.append(action_amount)
-                self.trading_memory.append(trade)
-
-            self.action_type.append(action_type)
+            # self.action_type.append(action_type)
             self.day += 1
             self.data = self.df.loc[self.day, :]
 
@@ -197,20 +183,21 @@ class Worker(gym.Env):
             reward = np.float32(0)
         return np.float32(reward)
 
-    def _handle_trading(self, action_type, action_amount):
+    def _handle_trading(self, action):
         if self.current_price == 0:
             return 0
 
         shares_to_sell = shares_to_buy = 0
 
-        if action_type == 2:  # Selling
+        if action < 0:  # Selling
             if self.shares_held <= 0.0001:
                 self.trading_pentalty += 1
                 self.invalid_action_count += 1
                 return 0
-            action_nominal_value = self.current_price * self.shares_held * action_amount
-            shares_to_sell = min(self.shares_held, int(
-                action_nominal_value / self.current_price))
+            action_nominal_value = self.current_price * \
+                self.shares_held * abs(action)
+            shares_to_sell = max(0, min(self.shares_held, int(
+                action_nominal_value / self.current_price)))
             assert np.isfinite(
                 shares_to_sell), f"shares_to_sell  is not finite (could be NaN, inf, or -inf) at day {self.day} and worker {self.worker_id}"
             sell_amount = self.current_price * \
@@ -222,7 +209,7 @@ class Worker(gym.Env):
             self.current_cash += np.float32(sell_amount)
             self.total_trades += 1
 
-        elif action_type == 1:
+        elif action > 0:
             if self.current_cash <= 0.9:
                 self.trading_pentalty += 1
                 self.invalid_action_count += 1
@@ -231,8 +218,10 @@ class Worker(gym.Env):
                 (self.current_price * (1 + self.trading_cost))
             assert np.isfinite(
                 max_affordable_shares), f"max_affordable_shares  is not finite (could be NaN, inf, or -inf) at day {self.day} and worker {self.worker_id}"
-            shares_to_buy = int(min(
-                max_affordable_shares, action_amount * self.current_cash / self.current_price))
+            shares_to_buy = int(
+                min(max_affordable_shares, action * self.current_cash / self.current_price))
+            assert np.isfinite(
+                shares_to_buy), f"shares_to_buy  is not finite (could be NaN, inf, or -inf) at day {self.day} and worker {self.worker_id}"
             buy_amount = self.current_price * \
                 shares_to_buy * (1 + self.trading_cost)
             assert np.isfinite(
@@ -298,7 +287,6 @@ class Worker(gym.Env):
             'pnl': np.array([self._calculate_pnl()], dtype=np.float32),
             'total_trades': np.array([self.total_trades], dtype=np.float32),
             'current_stock_exposure': np.array([self.current_price * self.shares_held], dtype=np.float32),
-            'current_allocation_limit': np.array([self.current_allocation_limit], dtype=np.float32),
 
         }
 
@@ -313,7 +301,6 @@ class Worker(gym.Env):
         self.day = 0
         self.current_step_cost = 0
         self.penalty = 0
-        self.allocation_limit_breach_count = 0
         self.total_costs = np.float32(0)
         self.total_trades = 0
         self.actions_memory = [0]
@@ -331,7 +318,6 @@ class Worker(gym.Env):
 
 
 # ?Currently not used
-
 
     def _calculate_return_std(self):
         """ Calculate the standard deviation of all returns for manager"""

@@ -23,10 +23,11 @@ idle_timeout_minutes: 5
 # Cloud-provider specific configuration.
 provider:
     type: gcp
-    region: us-west1
-    availability_zone: us-west1-a
+    # region: us-west1
+    region: us-east4
+    availability_zone: us-east4-a
     project_id: raytest-400811 # Globally unique project id
-
+# monitoring: True
 # How Ray will authenticate with newly launched nodes.
 auth:
     ssh_user: ubuntu
@@ -48,13 +49,15 @@ available_node_types:
         # For more documentation on available fields, see:
         # https://cloud.google.com/compute/docs/reference/rest/v1/instances/insert
         node_config:
-            machineType: c2-standard-8
+            # machineType: c2-standard-4
+            machineType: c3d-highmem-8
+            # machineType: c2d-highcpu-8
             disks:
               - boot: true
                 autoDelete: true
                 type: PERSISTENT
                 initializeParams:
-                  diskSizeGb: 50
+                  diskSizeGb: 300
                   # See https://cloud.google.com/compute/docs/images for more images
                   sourceImage: projects/deeplearning-platform-release/global/images/family/common-cpu
 
@@ -72,7 +75,7 @@ available_node_types:
     ray_worker_small:
         # The minimum number of nodes of this type to launch.
         # This number should be >= 0.
-        min_workers: 0
+        min_workers: 1
         resources: {"CPU": 4}
         
         # The resources provided by this node type.
@@ -82,19 +85,20 @@ available_node_types:
         # For more documentation on available fields, see:
         # https://cloud.google.com/compute/docs/reference/rest/v1/instances/insert
         node_config:
+            # machineType: c3d-highmem-4
             machineType: c2-standard-4
             disks:
               - boot: true
                 autoDelete: true
                 type: PERSISTENT
                 initializeParams:
-                  diskSizeGb: 50
+                  diskSizeGb: 300
                   # See https://cloud.google.com/compute/docs/images for more images
                   sourceImage: projects/deeplearning-platform-release/global/images/family/common-cpu
             # Run workers on preemtible instance by default.
             # Comment this out to use on-demand.
             scheduling:
-              - preemptible: true
+              - preemptible: false
 
     # Additional options can be found in in the compute docs at
     # https://cloud.google.com/compute/docs/reference/rest/v1/instances/insert
@@ -105,6 +109,7 @@ head_node_type: ray_head_default
 # Files or directories to copy to the head and worker nodes. The format is a
 # dictionary from REMOTE_PATH: LOCAL_PATH, e.g.
 file_mounts: {
+  # "~/home/ubuntu/": "/Users/floriankockler/Documents/GitHub.nosync/quantumai4",
   "/home/ubuntu/": "/Users/floriankockler/Documents/GitHub.nosync/quantumai4",
 #    "/path2/on/remote/machine": "/path2/on/local/machine",
 }
